@@ -27,24 +27,43 @@ function startScanner() {
 
 // 2. FETCH DATA
 async function fetchBookData(isbn) {
+    // 1. Clean the input (Remove everything except numbers and 'X')
+    const cleanIsbn = isbn.replace(/[^0-9X]/gi, '');
+    console.log("Searching for cleaned ISBN:", cleanIsbn);
+
     try {
-        const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn.trim()}`);
-        const data = await response.json();
+        // Try searching by ISBN specifically
+        let response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`);
+        let data = await response.json();
+
+        // 2. If ISBN search fails, try a general search (it's more "forgiving")
+        if (!data.items || data.items.length === 0) {
+            response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${cleanIsbn}`);
+            data = await response.json();
+        }
 
         if (data.items && data.items.length > 0) {
             const info = data.items[0].volumeInfo;
             const newBook = {
-                id: Date.now(), // Unique ID for each book
+                id: Date.now(),
                 title: info.title,
-                category: info.categories ? info.categories[0] : "Story",
                 image: info.imageLinks ? info.imageLinks.thumbnail : 'https://via.placeholder.com/128x192'
             };
             addBook(newBook);
         } else {
-            alert("Book not found! Try another.");
+            // 3. Manual Fallback
+            const manualTitle = prompt("I couldn't find that barcode in my big database. What is the name of this book?");
+            if (manualTitle) {
+                addBook({
+                    id: Date.now(),
+                    title: manualTitle,
+                    image: 'https://via.placeholder.com/128x192'
+                });
+            }
         }
     } catch (e) {
-        alert("Connection error!");
+        console.error("API Error:", e);
+        alert("Oops! The library is having trouble connecting to the internet.");
     }
 }
 
@@ -136,3 +155,4 @@ function saveAndRender() {
 }
 
 saveAndRender();
+
