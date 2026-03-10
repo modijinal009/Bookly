@@ -1,9 +1,13 @@
+// Initialize data from storage
 let myBooks = JSON.parse(localStorage.getItem('myBooks')) || [];
+let readingLog = JSON.parse(localStorage.getItem('readingLog')) || [];
 let points = parseInt(localStorage.getItem('points')) || 0;
+
 let startTime;
 let timerInterval;
+let currentBookTitle = "";
 
-// 1. START THE CAMERA
+// 1. SCANNER SETUP
 function startScanner() {
     const reader = document.getElementById('reader');
     reader.style.display = 'block';
@@ -14,45 +18,47 @@ function startScanner() {
         { fps: 10, qrbox: { width: 250, height: 150 } },
         (decodedText) => {
             fetchBookData(decodedText);
-            html5QrCode.stop();
-            reader.style.display = 'none';
+            html5QrCode.stop().then(() => {
+                reader.style.display = 'none';
+            });
         }
-    ).catch(err => alert("Camera Error: Check permissions!"));
+    ).catch(err => alert("Camera Error: Please allow camera access!"));
 }
 
-// 2. SEARCH GOOGLE BOOKS
+// 2. FETCH DATA
 async function fetchBookData(isbn) {
-    const cleanIsbn = isbn.trim();
     try {
-        const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`);
+        const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn.trim()}`);
         const data = await response.json();
 
         if (data.items && data.items.length > 0) {
             const info = data.items[0].volumeInfo;
             const newBook = {
+                id: Date.now(), // Unique ID for each book
                 title: info.title,
+                category: info.categories ? info.categories[0] : "Story",
                 image: info.imageLinks ? info.imageLinks.thumbnail : 'https://via.placeholder.com/128x192'
             };
             addBook(newBook);
         } else {
-            alert("Book not found! Try a different one.");
+            alert("Book not found! Try another.");
         }
     } catch (e) {
-        alert("Search failed. Check your internet!");
+        alert("Connection error!");
     }
 }
 
-// 3. ADD & SORT LIBRARY
+// 3. ADD TO LIBRARY (The Fix is here!)
 function addBook(book) {
-    myBooks.push(book);
-    // Sort A to Z
-    myBooks.sort((a, b) => a.title.localeCompare(b.title));
-    points += 10; // 10 points for adding a book
+    myBooks.push(book); // This adds to the existing array
+    myBooks.sort((a, b) => a.title.localeCompare(b.title)); // Alphabetical sort
+    points += 10;
     saveAndRender();
 }
 
-// 4. READING TIMER LOGIC
+// 4. TIMER & LOGGING
 function startReading(bookTitle) {
+    currentBookTitle = bookTitle;
     document.getElementById('reading-title').innerText = "Reading: " + bookTitle;
     document.getElementById('timer-modal').style.display = 'flex';
     startTime = Date.now();
@@ -68,26 +74,38 @@ function startReading(bookTitle) {
 function stopReading() {
     clearInterval(timerInterval);
     const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-    const earnedPoints = Math.max(1, Math.floor(elapsedSeconds / 60) * 5); // 5 points per minute
+    const minutesRead = Math.floor(elapsedSeconds / 60);
+    const earnedPoints = Math.max(5, minutesRead * 5);
+
+    // Create a log entry
+    const newLog = {
+        title: currentBookTitle,
+        duration: minutesRead,
+        date: new Date().toLocaleDateString()
+    };
+    readingLog.push(newLog);
 
     points += earnedPoints;
-    alert(`Great job! You earned ${earnedPoints} Star Points!`);
+    alert(`Finished! You read for ${minutesRead} minutes.`);
     
     document.getElementById('timer-modal').style.display = 'none';
     saveAndRender();
 }
 
-// 5. UPDATE THE SCREEN
+// 5. RENDER EVERYTHING
 function saveAndRender() {
+    // Save to browser memory
     localStorage.setItem('myBooks', JSON.stringify(myBooks));
+    localStorage.setItem('readingLog', JSON.stringify(readingLog));
     localStorage.setItem('points', points);
     
+    // Update Points
     document.getElementById('points').innerText = points;
+
+    // Render Book List
     const list = document.getElementById('book-list');
     list.innerHTML = '';
-
     myBooks.forEach(book => {
-        // We clean the title string to make sure the button works
         const safeTitle = book.title.replace(/'/g, "\\'");
         list.innerHTML += `
             <div class="book-card">
@@ -97,7 +115,24 @@ function saveAndRender() {
             </div>
         `;
     });
+
+    // Render Reading Log (History)
+    let logHTML = "<h3>📜 My Reading History</h3><ul style='list-style:none; padding:0;'>";
+    readingLog.slice().reverse().forEach(entry => {
+        logHTML += `<li style="background:#fff; margin:5px; padding:10px; border-radius:10px;">
+            <b>${entry.title}</b> - ${entry.duration} mins on ${entry.date}
+        </li>`;
+    });
+    logHTML += "</ul>";
+    
+    // Create a place for the log if it doesn't exist
+    let logContainer = document.getElementById('reading-history');
+    if (!logContainer) {
+        logContainer = document.createElement('div');
+        logContainer.id = 'reading-history';
+        document.body.appendChild(logContainer);
+    }
+    logContainer.innerHTML = logHTML;
 }
 
-// Show library on load
 saveAndRender();
