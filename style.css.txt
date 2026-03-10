@@ -1,0 +1,41 @@
+/* style.css */
+body {
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+    background-color: #FFFAEC; /* Soft yellow */
+    text-align: center;
+    padding: 20px;
+}
+
+#scan-btn {
+    background-color: #4CAF50; /* Bright Green */
+    color: white;
+    font-size: 24px;
+    padding: 20px 40px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px #2E7D32;
+}
+
+#scan-btn:active {
+    box-shadow: 0 2px #2E7D32;
+    transform: translateY(4px);
+}
+
+.book-card {
+    background: white;
+    border: 4px solid #FF9800; /* Orange border */
+    border-radius: 15px;
+    margin: 10px;
+    padding: 15px;
+    display: inline-block;
+    width: 150px;
+}
+
+#reward-badge {
+    background: #FFD700;
+    padding: 10px;
+    border-radius: 20px;
+    font-size: 20px;
+    display: inline-block;
+}
