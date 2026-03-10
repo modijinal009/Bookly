@@ -11,62 +11,68 @@ let currentBookTitle = "";
 function startScanner() {
     const reader = document.getElementById('reader');
     reader.style.display = 'block';
+    reader.innerHTML = "<p style='color:orange;'>Looking for barcode...</p>";
 
     const html5QrCode = new Html5Qrcode("reader");
+    
     html5QrCode.start(
         { facingMode: "environment" }, 
-        { fps: 10, qrbox: { width: 250, height: 150 } },
+        { fps: 15, qrbox: { width: 250, height: 150 } },
         (decodedText) => {
-            fetchBookData(decodedText);
+            // If the code is too short, ignore it (partial scan)
+            if (decodedText.length < 10) return;
+
+            // Pause the scanner visually so the user knows it hit
+            reader.innerHTML = "<h2 style='color:green;'>Got it! Searching...</h2>";
+            
+            // Stop the camera BEFORE searching to save battery
             html5QrCode.stop().then(() => {
                 reader.style.display = 'none';
+                fetchBookData(decodedText);
             });
         }
-    ).catch(err => alert("Camera Error: Please allow camera access!"));
+    ).catch(err => alert("Camera Error: Please refresh and allow camera!"));
 }
-
 // 2. FETCH DATA
 async function fetchBookData(isbn) {
-    // 1. Clean the input (Remove everything except numbers and 'X')
     const cleanIsbn = isbn.replace(/[^0-9X]/gi, '');
-    console.log("Searching for cleaned ISBN:", cleanIsbn);
-
+    
     try {
-        // Try searching by ISBN specifically
-        let response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`);
-        let data = await response.json();
+        // We try 2 different search types at once to be safe
+        const urls = [
+            `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`,
+            `https://www.googleapis.com/books/v1/volumes?q=${cleanIsbn}`
+        ];
 
-        // 2. If ISBN search fails, try a general search (it's more "forgiving")
-        if (!data.items || data.items.length === 0) {
-            response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${cleanIsbn}`);
-            data = await response.json();
-        }
+        let bookFound = false;
 
-        if (data.items && data.items.length > 0) {
-            const info = data.items[0].volumeInfo;
-            const newBook = {
-                id: Date.now(),
-                title: info.title,
-                image: info.imageLinks ? info.imageLinks.thumbnail : 'https://via.placeholder.com/128x192'
-            };
-            addBook(newBook);
-        } else {
-            // 3. Manual Fallback
-            const manualTitle = prompt("I couldn't find that barcode in my big database. What is the name of this book?");
-            if (manualTitle) {
+        for (let url of urls) {
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.items && data.items.length > 0) {
+                const info = data.items[0].volumeInfo;
                 addBook({
                     id: Date.now(),
-                    title: manualTitle,
-                    image: 'https://via.placeholder.com/128x192'
+                    title: info.title,
+                    image: info.imageLinks ? info.imageLinks.thumbnail : 'https://via.placeholder.com/128x192'
                 });
+                bookFound = true;
+                break; // Stop searching once we find it!
             }
         }
+
+        if (!bookFound) {
+            const manualTitle = prompt("I scanned " + cleanIsbn + " but couldn't find the name. What's the book called?");
+            if (manualTitle) {
+                addBook({ id: Date.now(), title: manualTitle, image: 'https://via.placeholder.com/128x192' });
+            }
+        }
+
     } catch (e) {
-        console.error("API Error:", e);
-        alert("Oops! The library is having trouble connecting to the internet.");
+        alert("Network error! Try again in a moment.");
     }
 }
-
 // 3. ADD TO LIBRARY (The Fix is here!)
 function addBook(book) {
     myBooks.push(book); // This adds to the existing array
@@ -155,4 +161,5 @@ function saveAndRender() {
 }
 
 saveAndRender();
+
 
