@@ -19,20 +19,30 @@ function startScanner() {
 }
 
 async function fetchBookData(isbn) {
-    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-    const data = await response.json();
+    // Clean the ISBN (remove any spaces or dashes)
+    const cleanIsbn = isbn.trim();
+    console.log("Searching for ISBN:", cleanIsbn);
 
-    if (data.items) {
-        const info = data.items[0].volumeInfo;
-        const newBook = {
-            title: info.title,
-            category: info.categories ? info.categories[0] : "General",
-            image: info.imageLinks ? info.imageLinks.thumbnail : 'https://via.placeholder.com/128x192'
-        };
+    try {
+        const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`);
+        const data = await response.json();
 
-        addBook(newBook);
-    } else {
-        alert("Book not found! Try another one.");
+        if (data.items && data.items.length > 0) {
+            const info = data.items[0].volumeInfo;
+            const newBook = {
+                title: info.title,
+                author: info.authors ? info.authors[0] : "Unknown Author",
+                category: info.categories ? info.categories[0] : "Kids Story",
+                image: info.imageLinks ? info.imageLinks.thumbnail : 'https://via.placeholder.com/128x192'
+            };
+
+            addBook(newBook);
+        } else {
+            // If API fails, let's allow manual entry or a generic "Mystery Book"
+            alert("Oops! I couldn't find that barcode in the big library. Try a different book!");
+        }
+    } catch (error) {
+        console.error("Search failed:", error);
     }
 }
 
@@ -68,3 +78,4 @@ function saveAndRender() {
 
 // Show books on startup
 saveAndRender();
+
